@@ -287,50 +287,50 @@ class RGBDDepth(nn.Module):
             return tensor.device
         return torch.device("cpu")
 
-    @torch.no_grad()
-    def infer_image(self, raw_image, depth_low_res, input_size=518):
-        inputs, (h, w) = self.image2tensor(raw_image, depth_low_res, input_size)
-        pred_depth = self.forward(inputs)
-        pred_depth = F.interpolate(pred_depth[:, None], (h, w), mode="nearest")[0, 0]
-        return pred_depth.cpu().numpy()
+    # @torch.no_grad()
+    # def infer_image(self, raw_image, depth_low_res, input_size=518):
+    #     inputs, (h, w) = self.image2tensor(raw_image, depth_low_res, input_size)
+    #     pred_depth = self.forward(inputs)
+    #     pred_depth = F.interpolate(pred_depth[:, None], (h, w), mode="nearest")[0, 0]
+    #     return pred_depth.cpu().numpy()
 
-    def image2tensor(self, raw_image, depth, input_size=518):
-        transform = Compose(
-            [
-                Resize(
-                    width=input_size,
-                    height=input_size,
-                    resize_target=True,
-                    keep_aspect_ratio=True,
-                    ensure_multiple_of=14,
-                    resize_method="lower_bound",
-                    image_interpolation_method=cv2.INTER_CUBIC,
-                ),
-                NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                PrepareForNet(),
-            ]
-        )
+    # def image2tensor(self, raw_image, depth, input_size=518):
+    #     transform = Compose(
+    #         [
+    #             Resize(
+    #                 width=input_size,
+    #                 height=input_size,
+    #                 resize_target=True,
+    #                 keep_aspect_ratio=True,
+    #                 ensure_multiple_of=14,
+    #                 resize_method="lower_bound",
+    #                 image_interpolation_method=cv2.INTER_CUBIC,
+    #             ),
+    #             NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    #             PrepareForNet(),
+    #         ]
+    #     )
 
-        h, w = raw_image.shape[:2]
+    #     h, w = raw_image.shape[:2]
 
-        image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) / 255.0
-        prepared = transform({"image": image, "depth": depth})
-        image = prepared["image"]
-        image = torch.from_numpy(image).unsqueeze(0)
+    #     image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) / 255.0
+    #     prepared = transform({"image": image, "depth": depth})
+    #     image = prepared["image"]
+    #     image = torch.from_numpy(image).unsqueeze(0)
 
-        depth = prepared["depth"]
-        depth = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
+    #     depth = prepared["depth"]
+    #     depth = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
 
-        inputs = torch.cat((image, depth), dim=1)
+    #     inputs = torch.cat((image, depth), dim=1)
 
-        DEVICE = (
-            "cuda"
-            if torch.cuda.is_available()
-            else "mps" if torch.backends.mps.is_available() else "cpu"
-        )
-        inputs = inputs.to(DEVICE)
+    #     DEVICE = (
+    #         "cuda"
+    #         if torch.cuda.is_available()
+    #         else "mps" if torch.backends.mps.is_available() else "cpu"
+    #     )
+    #     inputs = inputs.to(DEVICE)
 
-        return inputs, (h, w)
+    #     return inputs, (h, w)
     
     @torch.no_grad()
     def infer_depth(self, rgb: np.ndarray, depth: np.ndarray, input_size=518):
