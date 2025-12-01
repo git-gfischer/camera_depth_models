@@ -5,7 +5,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="rgbddepth",
+    name="camera_depth_models",
     version="1.0.0",
     packages=find_packages(),
     author="Manipulation as in Simulation Suite Contributors", 

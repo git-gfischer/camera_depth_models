@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from rgbddepth.dpt import RGBDDepth
+from camera_depth_models.dpt import RGBDDepth
 
 # Automatically select the best available device for inference
 DEVICE = (
@@ -211,40 +211,6 @@ def validate_inputs(args):
     output_dir = os.path.dirname(args.output)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
-
-
-def load_model(encoder, model_path):
-    """Load and initialize the RGBD depth estimation model.
-
-    Args:
-        encoder: Model encoder type ('vits', 'vitb', 'vitl', 'vitg')
-        model_path: Path to the model checkpoint file
-
-    Returns:
-        torch.nn.Module: Loaded model in evaluation mode
-    """
-    # Initialize model with configuration for specified encoder
-    model = RGBDDepth(**model_configs[encoder])
-
-    # Load checkpoint and extract state dict
-    checkpoint = torch.load(model_path, map_location="cpu")
-    if "model" in checkpoint:
-        # Handle checkpoints that wrap state dict in 'model' key
-        # Remove 'module.' prefix if present (from DataParallel training)
-        states = {k[7:]: v for k, v in checkpoint["model"].items()}
-    elif "state_dict" in checkpoint:
-        states = checkpoint["state_dict"]
-        states = {k[9:]: v for k, v in states.items()}
-    else:
-        # Direct state dict checkpoint
-        states = checkpoint
-
-    # Load weights and move to device
-    model.load_state_dict(states, strict=False)
-    model = model.to(DEVICE).eval()
-
-    print(f"Model loaded: {encoder} from {model_path}")
-    return model
 
 
 def load_images(rgb_path, depth_path, depth_scale, max_depth):
