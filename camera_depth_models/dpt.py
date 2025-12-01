@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from torchvision.transforms import Compose
 
 from .dinov2 import DINOv2
@@ -277,6 +279,14 @@ class RGBDDepth(nn.Module):
         depth = F.relu(depth)
         return depth.squeeze(1)
 
+    @property
+    def device(self):
+        for tensor in self.parameters():
+            return tensor.device
+        for tensor in self.buffers():
+            return tensor.device
+        return torch.device("cpu")
+
     @torch.no_grad()
     def infer_image(self, raw_image, depth_low_res, input_size=518):
         inputs, (h, w) = self.image2tensor(raw_image, depth_low_res, input_size)
@@ -321,3 +331,62 @@ class RGBDDepth(nn.Module):
         inputs = inputs.to(DEVICE)
 
         return inputs, (h, w)
+    
+    @torch.no_grad()
+    def infer_depth(self, rgb: np.ndarray, depth: np.ndarray, input_size=518):
+        """
+        Run a forward pass that fuses an RGB frame with a (possibly sparse) depth map.
+
+        Args:
+            rgb (np.ndarray): `H x W x 3` array containing the color image (as RGB). Accepts
+                uint8 in ``[0, 255]`` or float arrays already normalized to ``[0, 1]``.
+            depth (np.ndarray): `H x W` metric depth map where invalid pixels are set
+                to zero. Internally converted to inverse depth before being fed to the model.
+            input_size (int): Target spatial resolution (in pixels) used by the resize
+                transform prior to encoding. Defaults to 518, which matches the DPT
+                checkpoint this wrapper was built for.
+
+        Returns:
+            np.ndarray: Dense depth prediction in meters, resized to the original
+                ``H x W`` resolution.
+        """
+        depth_inverted = np.zeros_like(depth)
+        depth_inverted[depth > 0] = 1.0 / depth[depth > 0]
+
+        transform = Compose(
+            [
+                Resize(
+                    width=input_size,
+                    height=input_size,
+                    resize_target=True,
+                    keep_aspect_ratio=True,
+                    ensure_multiple_of=14,
+                    resize_method="lower_bound",
+                    image_interpolation_method=cv2.INTER_CUBIC,
+                ),
+                NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                PrepareForNet(),
+            ]
+        )
+
+        h, w = rgb.shape[:2]
+
+        if rgb.dtype == np.uint8:
+            image = rgb.astype(np.float32) / 255.0
+        elif np.issubdtype(rgb.dtype, np.floating):
+            image = rgb.astype(np.float32, copy=False)
+        else:
+            raise TypeError(f"Unsupported rgb dtype: {rgb.dtype}")
+        prepared = transform({"image": image, "depth": depth_inverted})
+
+        image_t = torch.from_numpy(prepared["image"]).unsqueeze(0)
+        depth_inverted_t = torch.from_numpy(prepared["depth"]).unsqueeze(0).unsqueeze(0)
+
+        inputs = torch.cat((image_t, depth_inverted_t), dim=1)
+        inputs = inputs.to(self.device)
+
+        pred_depth_inverted = self.forward(inputs)
+        pred_depth_inverted = F.interpolate(pred_depth_inverted[:, None], (h, w), mode="nearest")[0, 0]
+        pred_depth_inverted = pred_depth_inverted.cpu().numpy()
+
+        return 1.0 / pred_depth_inverted
