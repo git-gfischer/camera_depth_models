@@ -1,0 +1,9 @@
+# Only what docker/Dockerfile copies; models and results are mounted at run time.
+**
+!camera_depth_models
+!scripts
+!assets/example_data
+!cpp
+!docker/build_engine.sh
+**/__pycache__
+cpp/build

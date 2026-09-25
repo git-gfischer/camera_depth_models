@@ -1,0 +1,20 @@
+# cdm_realsense settings (`docker compose run --rm realsense`). Keys are the
+# tool's command-line options with '_' for '-'; options on the command line
+# override them, e.g. `docker compose run --rm realsense --list`.
+
+# Which engine to load. Its width and height are also the stream resolution.
+engine_config: engine.yaml
+
+# Camera: empty serial = the first one found (`--list` shows them).
+serial: ""
+fps: 30
+warmup: 30           # frames skipped at start while auto-exposure settles
+frames: 0            # stop after N processed frames; 0 = until q/ESC or Ctrl-C
+
+# Recording: empty = off. A directory under /output (CDM_OUTPUT) gets rgb/,
+# depth/ (aligned raw), cdm/, associations.txt and camera.yaml (the device's
+# factory intrinsics); it replays through the dataset service.
+record: ""
+
+no_display: false    # true: no window, one line of statistics per second
+max_depth_viz: 0     # colour range in metres; 0 = from the first frame

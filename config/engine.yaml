@@ -1,0 +1,39 @@
+# Which CDM engine to build (`docker compose run --rm engine`) and which one the
+# dataset and RealSense tools load. Paths are inside the container: /models is
+# CDM_MODELS in paths.env.
+
+# Checkpoint: depth-anything/camera-depth-model-<model> on Hugging Face, one of
+# d435, d405, l515, kinect, zed2i-neural, zed2i-quality, base. Downloaded to
+# checkpoint if missing (weights licensed CC-BY-NC-4.0).
+model: d435
+checkpoint: /models/cdm_d435.ckpt
+
+# Camera resolution the engine serves. An engine takes exactly this size: the
+# RealSense tool streams at it, and frames of another size are refused.
+width: 640
+height: 480
+
+# fp16: median depth error 4e-4 of the FP32 model, ~28 ms on an RTX 5070 Ti.
+# fp32: the exact network, ~134 ms and twice the GPU memory.
+precision: fp16
+
+# infer_depth's input_size: sets the network resolution (640x480 -> 686x518).
+input_size: 518
+
+# The engine file (its ONNX goes next to it). The builder skips every step
+# whose output already exists, so after changing a setting above, change this
+# name too (or delete the old .engine/.onnx), or the old engine is reused.
+engine: /models/cdm_d435_640x480_fp16.engine
+
+# Parity check: the Python model's output on one frame, which every build is
+# compared against. Defaults: the repository's example frame, resized to
+# width x height, stored in /models/cdm_<model>_<W>x<H>_reference.
+# reference_dir: /models/cdm_d435_640x480_reference
+# reference_rgb: /data/my_sequence/rgb/000000.png
+# reference_depth: /data/my_sequence/depth/000000.png
+# reference_depth_factor: 1000
+
+# Builder details.
+# opset: 17
+# no_tf32: false        # true: no TF32 in fp32 engines
+# workspace_mb: 4096

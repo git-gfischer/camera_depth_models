@@ -152,3 +152,8 @@ cython_debug/
 output.*
 *checkpoints
 checkpoints*
+# CDM TensorRT: mounted model and result directories, C++ build
+models/
+output/
+cpp/build/
+data/

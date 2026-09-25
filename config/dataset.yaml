@@ -1,0 +1,44 @@
+# cdm_dataset settings (`docker compose run --rm dataset`). Keys are the tool's
+# command-line options with '_' for '-'; options on the command line override
+# them, e.g. `docker compose run --rm dataset --max-frames 10`.
+# Paths are inside the container: /data is CDM_DATASETS, /output is CDM_OUTPUT.
+
+# Which engine to load (engine and input_size come from there).
+engine_config: engine.yaml
+
+# Input, either a TUM-style associations file ("rgb_ts rgb depth_ts depth",
+# paths relative to the file) ...
+associations: /data/moving_robots/associations.txt
+# ... or two folders of RGB and uint16 depth images paired by file name:
+# rgb_dir: /data/my_sequence/rgb
+# depth_dir: /data/my_sequence/depth
+
+# Raw depth units per metre of the depth PNGs (1000 = millimetres). Optional
+# when the camera block states depth_factor; the two must agree.
+depth_factor: 1000
+
+# Intrinsics of the camera that took the sequence. CDM does not use them (the
+# network sees images only): they are checked against the frame size and
+# written to <output>/camera.yaml, so the CDM depth can be back-projected
+# later. Either inline, or a path to a camera.yaml such as the one
+# `realsense` recordings contain (camera: /data/live/camera.yaml). Remove the
+# block if you do not have them.
+# These are the RealSense D435i colour intrinsics of Input/moving_robots.
+camera:
+  width: 640
+  height: 480
+  fx: 614.3170166015625
+  fy: 614.9486694335938
+  cx: 315.5247497558594
+  cy: 230.0548858642578
+  distortion_model: plumb_bob
+  distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+  depth_factor: 1000
+
+# Results.
+output: /output/moving_robots
+stride: 1            # every N-th frame
+max_frames: 0        # 0 = all
+viz: true            # RGB | sensor | CDM previews in <output>/viz
+show: false          # also display them (needs X, see README)
+max_depth_viz: 0     # colour range in metres; 0 = from the first frame

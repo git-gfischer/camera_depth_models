@@ -1,0 +1,72 @@
+# CDM on TensorRT. Host paths and your UID are in config/paths.env, which
+# Compose reads through the symlink docker/.env; what each service does is set
+# by the YAML files in config/. Relative paths are relative to docker/.
+#
+# From the repository root:
+#   docker compose -f docker/docker-compose.yaml build engine     # the image (shared by all services)
+#   docker compose -f docker/docker-compose.yaml run --rm engine   # build + verify the engine (config/engine.yaml)
+#   docker compose -f docker/docker-compose.yaml run --rm dataset  # run on a sequence (config/dataset.yaml)
+#   docker compose -f docker/docker-compose.yaml run --rm realsense  # run live (config/realsense.yaml)
+# or, from docker/, plain `docker compose run --rm <service>`.
+#
+# Arguments after the service name are passed to the tool and override its
+# config, e.g. `... run --rm dataset --max-frames 10`. Each service has a
+# profile of its own name, so `docker compose up` alone starts nothing.
+
+x-cdm: &cdm
+  image: cdm-trt:latest
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  gpus: all
+  user: "${CDM_UID:?set CDM_UID in config/paths.env}:${CDM_GID:?set CDM_GID in config/paths.env}"
+  volumes:
+    - ${CDM_MODELS:?}:/models
+    - ${CDM_DATASETS:?}:/data:ro
+    - ${CDM_OUTPUT:?}:/output
+    - ../config:/config:ro
+
+services:
+  engine:
+    <<: *cdm
+    profiles: [engine]
+    entrypoint: [cdm_build_engine]
+    environment:
+      CDM_CONFIG: /config/${CDM_ENGINE_CONFIG:-engine.yaml}
+
+  dataset:
+    <<: *cdm
+    profiles: [dataset]
+    # --config is part of the entrypoint: arguments given to `docker compose run`
+    # replace `command`, so there they would drop the config instead of
+    # overriding single settings.
+    entrypoint: [cdm_dataset, --config, "/config/${CDM_DATASET_CONFIG:-dataset.yaml}"]
+    # For `show: true`: the host X server (allow it with `xhost +local:docker`).
+    environment:
+      DISPLAY: ${DISPLAY:-}
+    volumes:
+      - ${CDM_MODELS:?}:/models
+      - ${CDM_DATASETS:?}:/data:ro
+      - ${CDM_OUTPUT:?}:/output
+      - ../config:/config:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+
+  realsense:
+    <<: *cdm
+    profiles: [realsense]
+    entrypoint: [cdm_realsense, --config, "/config/${CDM_REALSENSE_CONFIG:-realsense.yaml}"]
+    # librealsense's libusb backend opens the camera's USB device nodes,
+    # including those created when it re-enumerates: /dev is bind-mounted, the
+    # container is privileged and runs as root. Recordings are therefore owned
+    # by root.
+    user: "0:0"
+    privileged: true
+    environment:
+      DISPLAY: ${DISPLAY:-}
+    volumes:
+      - ${CDM_MODELS:?}:/models
+      - ${CDM_DATASETS:?}:/data:ro
+      - ${CDM_OUTPUT:?}:/output
+      - ../config:/config:ro
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
